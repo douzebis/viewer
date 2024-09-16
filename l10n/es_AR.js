@@ -1,7 +1,25 @@
 OC.L10N.register(
     "viewer",
     {
+    "LIVE" : "EN VIVO",
+    "Edit" : "Editar",
     "Open sidebar" : "Abrir barra lateral",
-    "Delete" : "Eliminar"
+    "Download" : "Descargar",
+    "Delete" : "Eliminar",
+    "View" : "Ver",
+    "Name" : "Nombre",
+    "Save" : "Guardar",
+    "Back" : "Atrás",
+    "Loading …" : "Cargando …",
+    "Reset" : "Restablecer",
+    "Cancel" : "Cancelar",
+    "Continue" : "Continuar",
+    "Undo" : "Deshacer",
+    "Custom" : "Personalizado",
+    "Value" : "Valor",
+    "Line" : "Linea",
+    "Text" : "Texto",
+    "Size" : "Tamaño",
+    "Position" : "Posición"
 },
-"nplurals=2; plural=(n != 1);");
+"nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;");

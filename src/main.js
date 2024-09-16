@@ -3,7 +3,7 @@
  *
  * @author John Molakvoæ <skjnldsv@protonmail.com>
  *
- * @license GNU AGPL version 3 or any later version
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,34 +19,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
+import { translate as t } from '@nextcloud/l10n'
 import Vue from 'vue'
-import ViewerComponent from './views/Viewer'
-import ViewerService from './services/Viewer'
 
-import { generateFilePath } from '@nextcloud/router'
+import ViewerComponent from './views/Viewer.vue'
 
-Vue.prototype.t = t
-Vue.prototype.n = n
+Vue.mixin({
+	methods: {
+		t,
+	},
+})
 
-Vue.prototype.OC = OC
-Vue.prototype.OCA = OCA
-
-// CSP config for webpack dynamic chunk loading
-// eslint-disable-next-line
-__webpack_nonce__ = btoa(OC.requestToken)
-
-// Correct the root of the app for chunk loading
-// OC.linkTo matches the apps folders
-// OC.generateUrl ensure the index.php (or not)
-// We do not want the index.php since we're loading files
-// eslint-disable-next-line
-__webpack_public_path__ = generateFilePath('viewer', '', 'js/')
-
-// Init Viewer Service
-if (window.OCA) {
-	Object.assign(window.OCA, { Viewer: new ViewerService() })
-	OCA.Viewer.version = appVersion
-}
+Vue.prototype.OC = window.OC
+Vue.prototype.OCA = window.OCA
 
 // Create document root
 const ViewerRoot = document.createElement('div')

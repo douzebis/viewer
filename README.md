@@ -2,7 +2,7 @@
 
 Show your latest holiday photos and videos like in the movies. Show a glimpse of your latest novel directly from your nextcloud. Choose the best GIF of your collection thanks to the direct view of your favorites files!
 
-![viewer](https://raw.githubusercontent.com/nextcloud/screenshots/master/apps/Viewer/viewer.png)
+![viewer](https://raw.githubusercontent.com/nextcloud/screenshots/master/apps/Viewer/viewer.png?v=2)
 
 ## 📋 Current support
 - Images
@@ -10,12 +10,18 @@ Show your latest holiday photos and videos like in the movies. Show a glimpse of
 
 ## 🏗 Development setup
 1. ☁ Clone this app into the `apps` folder of your Nextcloud: `git clone https://github.com/nextcloud/viewer.git`
-2. 👩‍💻 In the folder of the app, run the command `make` to install dependencies and build the Javascript.
-3. ✅ Enable the app through the app management of your Nextcloud
-4. 🎉 Partytime!
+2. 👩‍💻 In the folder of the app, install dependencies with `npm ci` and build the Javascript with `npm run build`.
+3. 🎉 Partytime!
 
 ### 🧙 Advanced development stuff
-To build the Javascript whenever you make changes, instead of the full `make` you can also run `make build-js`.
+To build the Javascript whenever you make changes, you can also run `npm run dev` for development builds.
+
+### 📷 Running cypress tests
+To run e2e cypress tests, execute `npm run cypress`.
+
+The `visual-regression` tests require additional care as they depend on installation of fonts in the application. To achieve repeatable results run the tests using `npm run cypress:visual-regression`. This will build the app with the required fonts and run the tests.
+
+If changes are required to the reference (base) screenshots used by the `visual-regression` tests, run `cypress:update-snapshots` and commit the updated screenshots.
 
 ## API
 
@@ -31,15 +37,15 @@ use OCP\IRequest;
 
 class PageController extends Controller {
 	protected $appName;
-	
+
 	/** @var IEventDispatcher */
 	private $eventDispatcher;
-	
+
 	public function __construct($appName,
 								IRequest $request,
 								IEventDispatcher $eventDispatcher) {
 		parent::__construct($appName, $request);
-	
+
 		$this->appName = $appName;
 		$this->eventDispatcher = $eventDispatcher;
 	}
@@ -61,11 +67,11 @@ class PageController extends Controller {
 This will load all the necessary scripts and make the Viewer accessible trough javascript at `OCA.Viewer`
 
 ### Open a file
-1. Open a file and let the viewer fetch the folder data
+1. Open a file on WebDAV and let the viewer fetch the folder data
   ```js
   OCA.Viewer.open({path: '/path/to/file.jpg'})
   ```
-2. Open a file and profide a list of files
+2. Open a file on WebDAV and provide a list of files
   ```js
   OCA.Viewer.open({
 		path: '/path/to/file.jpg',
@@ -78,8 +84,55 @@ This will load all the necessary scripts and make the Viewer accessible trough j
 			...
 		],
   })
+  // Alternative: pass known file info so it doesn't need to be fetched
+  const fileInfo = {
+	filename: '/path/to/file.jpg',
+	basename: 'file.jpg',
+	mime: 'image/jpeg',
+	etag: 'xyz987',
+	hasPreview: true,
+	fileid: 13579,
+  }
+  OCA.Viewer.open({
+	fileinfo: fileInfo,
+	list: [fileInfo],
+  })
   ```
-  The list parameter requires an array of fileinfo. You can check how we generate a fileinfo object [here](https://github.com/nextcloud/viewer/blob/master/src/utils/fileUtils.js#L97) from a dav PROPFIND request data. There is currently no dedicated package for it, but this is coming. You can check the [photos](https://github.com/nextcloud/photos) repository where we also uses it.
+  The list parameter requires an array of fileinfo. You can check how we generate a fileinfo object [here](https://github.com/nextcloud/viewer/blob/master/src/utils/fileUtils.js#L97) from a dav PROPFIND request data. There is currently no dedicated package for it, but this is coming. You can check the [photos](https://github.com/nextcloud/photos) repository where we also use it.
+
+3. Open a file from an app's route
+  ```js
+  const fileInfo1 = {
+	filename: 'https://next.cloud/apps/pizza/topping/pineapple.jpg',
+	basename: 'pineapple.jpg',
+	source: 'https://next.cloud/apps/pizza/topping/pineapple.jpg',
+	mime: 'image/jpeg',
+	etag: 'abc123',
+	hasPreview: false,
+	fileid: 12345,
+  }
+  const fileInfo2 = {
+	filename: 'https://next.cloud/apps/pizza/topping/garlic.jpg',
+	basename: 'garlic.jpg',
+	source: 'https://next.cloud/apps/pizza/topping/garlic.jpg',
+	mime: 'image/jpeg',
+	etag: 'def456',
+	hasPreview: false,
+	fileid: 67890,
+  }
+  OCA.Viewer.open({
+	fileInfo: fileInfo1,
+	list: [fileInfo1, fileInfo2],
+  })
+  ```
+
+In order to open a shared file you will need to provide the share token
+so the Viewer can use it to authenticate the requests to the server.
+See the `files_sharing` app
+[controller](https://github.com/nextcloud/server/blob/master/apps/files_sharing/lib/Controller/ShareController.php#L404)
+and
+[template](https://github.com/nextcloud/server/blob/master/apps/files_sharing/templates/public.php#L18)
+for an example.
 
 ### Close the viewer
 ```js

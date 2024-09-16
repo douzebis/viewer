@@ -1,10 +1,9 @@
-
 /**
  * @copyright Copyright (c) 2019 John Molakvoæ <skjnldsv@protonmail.com>
  *
  * @author John Molakvoæ <skjnldsv@protonmail.com>
  *
- * @license GNU AGPL version 3 or any later version
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,28 +19,31 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  */
-import { generateUrl } from '@nextcloud/router'
-import { getToken, isPublic } from '../utils/davUtils'
-import { encodeFilePath, getDavPath } from '../utils/fileUtils'
+import { getPreviewIfAny } from '../utils/previewUtils.ts'
+import { getDavPath } from '../utils/fileUtils.ts'
 
 export default {
 	computed: {
 		/**
 		 * Link to the preview path if the file have a preview
-		 * @returns {string}
+		 *
+		 * @return {string}
 		 */
-		previewpath() {
+		previewPath() {
 			return this.getPreviewIfAny({
 				fileid: this.fileid,
 				filename: this.filename,
+				previewUrl: this.previewUrl,
 				hasPreview: this.hasPreview,
 				davPath: this.davPath,
+				etag: this.$attrs.etag,
 			})
 		},
 
 		/**
 		 * Absolute dav remote path of the file
-		 * @returns {string}
+		 *
+		 * @return {string}
 		 */
 		davPath() {
 			return getDavPath({
@@ -49,28 +51,23 @@ export default {
 				basename: this.basename,
 			})
 		},
-
 	},
 	methods: {
 		/**
 		 * Return the preview url if the file have an existing
 		 * preview or the absolute dav remote path if none.
 		 *
-		 * @param {Object} data destructuring object
+		 * @param {object} data destructuring object
 		 * @param {string} data.fileid the file id
+		 * @param {string} [data.previewUrl] URL of the file preview
 		 * @param {boolean} data.hasPreview have the file an existing preview ?
 		 * @param {string} data.davPath the absolute dav path
-		 * @returns {String} the absolute url
+		 * @param {string} data.filename the file name
+		 * @param {string|null} data.etag the etag of the file
+		 * @return {string} the absolute url
 		 */
-		getPreviewIfAny({ fileid, filename, hasPreview, davPath }) {
-			if (hasPreview) {
-				// TODO: find a nicer standard way of doing this?
-				if (isPublic()) {
-					return generateUrl(`/apps/files_sharing/publicpreview/${getToken()}?fileId=${fileid}&file=${encodeFilePath(filename)}&x=${screen.width}&y=${screen.height}&a=true`)
-				}
-				return generateUrl(`/core/preview?fileId=${fileid}&x=${screen.width}&y=${screen.height}&a=true`)
-			}
-			return davPath
+		getPreviewIfAny(data) {
+			return getPreviewIfAny(data)
 		},
 	},
 }

@@ -1,4 +1,11 @@
 { "translations": {
-    "Delete" : "Padam"
+    "Edit" : "Sunting",
+    "Download" : "Muat turun",
+    "Delete" : "Padam",
+    "Name" : "Nama",
+    "Save" : "Simpan",
+    "Back" : "Kembali",
+    "Cancel" : "Batal",
+    "Size" : "Saiz"
 },"pluralForm" :"nplurals=1; plural=0;"
 }

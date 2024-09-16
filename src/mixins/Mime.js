@@ -3,7 +3,7 @@
  *
  * @author John Molakvoæ <skjnldsv@protonmail.com>
  *
- * @license GNU AGPL version 3 or any later version
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,7 +20,7 @@
  *
  */
 import debounce from 'debounce'
-import PreviewUrl from '../mixins/PreviewUrl'
+import PreviewUrl from '../mixins/PreviewUrl.js'
 import parsePath from 'path-parse'
 
 export default {
@@ -42,15 +42,25 @@ export default {
 			type: String,
 			required: true,
 		},
-		// file path relative to user folder
+		// file source to fetch contents from
+		source: {
+			type: String,
+			default: undefined,
+		},
+		// URL the file preview
+		previewUrl: {
+			type: String,
+			default: undefined,
+		},
+		// should the standard core preview be used?
 		hasPreview: {
 			type: Boolean,
-			required: true,
+			default: false,
 		},
 		// unique file id
 		fileid: {
-			type: Number,
-			required: true,
+			type: [Number, String],
+			required: false,
 		},
 		// list of all the visible files
 		fileList: {
@@ -67,6 +77,10 @@ export default {
 			type: Boolean,
 			default: true,
 		},
+		canZoom: {
+			type: Boolean,
+			default: false,
+		},
 		// is the content loaded?
 		// synced with parent
 		loaded: {
@@ -82,6 +96,11 @@ export default {
 		isFullScreen: {
 			type: Boolean,
 			default: false,
+		},
+		// The file id of the peer live photo file
+		metadataFilesLivePhoto: {
+			type: Number,
+			default: undefined,
 		},
 	},
 
@@ -101,6 +120,9 @@ export default {
 		},
 		ext() {
 			return parsePath(this.basename).ext
+		},
+		src() {
+			return this.source ?? this.davPath
 		},
 	},
 
@@ -155,11 +177,9 @@ export default {
 			const modalWrapper = this.$parent.$el.querySelector('.modal-wrapper')
 			if (modalWrapper && this.naturalHeight > 0 && this.naturalWidth > 0) {
 				const modalContainer = modalWrapper.querySelector('.modal-container')
-				const wrapperMaxHeight = Number(window.getComputedStyle(modalContainer).maxHeight.replace('%', ''))
-				const wrapperMaxWidth = Number(window.getComputedStyle(modalContainer).maxWidth.replace('%', ''))
 
-				const parentHeight = Math.round(modalWrapper.clientHeight * wrapperMaxHeight / 100) - 50 // minus header
-				const parentWidth = Math.round(modalWrapper.clientWidth * wrapperMaxWidth / 100)
+				const parentHeight = modalContainer.clientHeight
+				const parentWidth = modalContainer.clientWidth
 
 				const heightRatio = parentHeight / this.naturalHeight
 				const widthRatio = parentWidth / this.naturalWidth
@@ -181,6 +201,9 @@ export default {
 					this.height = this.naturalHeight
 					this.width = this.naturalWidth
 				}
+			} else {
+				this.height = this.naturalHeight
+				this.width = this.naturalWidth
 			}
 		},
 

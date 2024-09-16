@@ -3,8 +3,9 @@
  *
  * @author Marco Ambrosini <marcoambrosini@pm.me>
  * @author John Molakvoæ <skjnldsv@protonmail.com>
+ * @author Louis Chemineau <louis@chmn.me>
  *
- * @license GNU AGPL version 3 or any later version
+ * @license AGPL-3.0-or-later
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,36 +22,30 @@
  *
  */
 
-import axios from '@nextcloud/axios'
-
 /**
  * Creates a cancelable axios 'request object'.
  *
- * @param {function} request the axios promise request
- * @returns {Object}
+ * @param {Function} request the axios promise request
+ * @return {object}
  */
 const CancelableRequest = function(request) {
-	/**
-	 * Generate an axios cancel token
-	 */
-	const CancelToken = axios.CancelToken
-	const source = CancelToken.source()
+	const controller = new AbortController()
 
 	/**
 	 * Execute the request
 	 *
 	 * @param {string} url the url to send the request to
-	 * @param {Object} [options] optional config for the request
+	 * @param {object} [options] optional config for the request
 	 */
 	const fetch = async function(url, options) {
 		return request(
 			url,
-			Object.assign({ cancelToken: source.token }, { options })
+			{ ...options, signal: controller.signal },
 		)
 	}
 	return {
 		request: fetch,
-		cancel: source.cancel,
+		cancel: () => controller.abort(),
 	}
 }
 

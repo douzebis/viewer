@@ -2,8 +2,9 @@
  - @copyright Copyright (c) 2019 John Molakvoæ <skjnldsv@protonmail.com>
  -
  - @author John Molakvoæ <skjnldsv@protonmail.com>
+ - @author Richard Steinmetz <richard@steinmetz.cloud>
  -
- - @license GNU AGPL version 3 or any later version
+ - @license AGPL-3.0-or-later
  -
  - This program is free software: you can redistribute it and/or modify
  - it under the terms of the GNU Affero General Public License as
@@ -23,20 +24,18 @@
 <template>
 	<!-- Plyr currently replaces the parent. Wrapping to prevent this
 	https://github.com/redxtech/vue-plyr/issues/259 -->
-	<div v-if="davPath">
-		<VuePlyr
-			ref="plyr"
+	<div v-if="src">
+		<VuePlyr ref="plyr"
 			:options="options"
 			:style="{
 				height: height + 'px',
 				width: width + 'px'
 			}">
-			<video
-				ref="video"
-				:autoplay="active"
+			<video ref="video"
+				:autoplay="active ? true : null"
 				:playsinline="true"
 				:poster="livePhotoPath"
-				:src="davPath"
+				:src="src"
 				preload="metadata"
 				@ended="donePlaying"
 				@canplay="doneLoading"
@@ -55,29 +54,38 @@
 </template>
 
 <script>
-import Vue from 'vue'
-import VuePlyr from '@skjnldsv/vue-plyr'
+// eslint-disable-next-line n/no-missing-import
 import '@skjnldsv/vue-plyr/dist/vue-plyr.css'
+import { imagePath } from '@nextcloud/router'
+import logger from '../services/logger.js'
+import { findLivePhotoPeerFromName } from '../utils/livePhotoUtils'
+import { getPreviewIfAny } from '../utils/previewUtils'
 
-const liveExt = ['jpg', 'jpeg', 'png']
-const liveExtRegex = new RegExp(`\\.(${liveExt.join('|')})$`, 'i')
+const VuePlyr = () => import(/* webpackChunkName: 'plyr' */'@skjnldsv/vue-plyr')
 
-Vue.use(VuePlyr)
+const blankVideo = imagePath('viewer', 'blank.mp4')
 
 export default {
 	name: 'Videos',
 
+	components: {
+		VuePlyr,
+	},
+	data() {
+		return {
+			isFullscreenButtonVisible: false,
+		}
+	},
+
 	computed: {
-		livePhoto() {
-			return this.fileList.find(file => {
-				// if same filename and extension is allowed
-				return file.filename !== this.filename
-					&& file.basename.startsWith(this.name)
-					&& liveExtRegex.test(file.basename)
-			})
-		},
 		livePhotoPath() {
-			return this.livePhoto && this.getPreviewIfAny(this.livePhoto)
+			const peerFile = findLivePhotoPeerFromName(this, this.fileList)
+
+			if (peerFile === undefined) {
+				return undefined
+			}
+
+			return getPreviewIfAny(peerFile)
 		},
 		player() {
 			return this.$refs.plyr.player
@@ -85,8 +93,13 @@ export default {
 		options() {
 			return {
 				autoplay: this.active === true,
+				// Used to reset the video streams https://github.com/sampotts/plyr#javascript-1
+				blankVideo,
 				controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'captions', 'settings', 'fullscreen'],
 				loadSprite: false,
+				fullscreen: {
+					iosNative: true,
+				},
 			}
 		},
 	},
@@ -103,12 +116,47 @@ export default {
 			}
 		},
 	},
+	// for some reason the video controls don't get mounted to the dom until after the component (Videos) is mounted,
+	// using the mounted() hook will leave us with an empty array
+
+	updated() {
+		// Prevent swiping to the next/previous item when scrubbing the timeline or changing volume
+		[...this.$el.querySelectorAll('.plyr__controls__item')].forEach(control => {
+			if (control.getAttribute('data-plyr') === 'fullscreen') {
+				control.addEventListener('click', this.hideHeaderAndFooter)
+			}
+			if (!control?.addEventListener) {
+				return
+			}
+			control.addEventListener('mouseenter', this.disableSwipe)
+			control.addEventListener('mouseleave', this.enableSwipe)
+		})
+	},
+
+	beforeDestroy() {
+		// Force stop any ongoing request
+		logger.debug('Closing video stream', { filename: this.filename })
+		this.$refs.video?.pause?.()
+		this.player.stop()
+		this.player.destroy()
+	},
 
 	methods: {
+		hideHeaderAndFooter() {
+			// work arround to get the state of the fullscreen button, aria-selected attribute is not reliable
+			this.isFullscreenButtonVisible = !this.isFullscreenButtonVisible
+			if (this.isFullscreenButtonVisible) {
+				document.body.querySelector('main').classList.add('viewer__hidden-fullscreen')
+				document.body.querySelector('footer').classList.add('viewer__hidden-fullscreen')
+			} else {
+				document.body.querySelector('main').classList.remove('viewer__hidden-fullscreen')
+				document.body.querySelector('footer').classList.remove('viewer__hidden-fullscreen')
+			}
+		},
 		// Updates the dimensions of the modal
 		updateVideoSize() {
-			this.naturalHeight = this.$refs.video && this.$refs.video.videoHeight
-			this.naturalWidth = this.$refs.video && this.$refs.video.videoWidth
+			this.naturalHeight = this.$refs.video?.videoHeight
+			this.naturalWidth = this.$refs.video?.videoWidth
 			this.updateHeightWidth()
 		},
 
@@ -120,6 +168,10 @@ export default {
 
 		onLoadedMetadata() {
 			this.updateVideoSize()
+			// Force any further loading once we have the metadata
+			if (!this.active) {
+				this.player.stop()
+			}
 		},
 	},
 }
@@ -127,44 +179,54 @@ export default {
 
 <style scoped lang="scss">
 video {
-	background-color: black;
-	max-width: 100%;
-	max-height: 100%;
-	align-self: center;
-	justify-self: center;
 	/* over arrows in tiny screens */
 	z-index: 20050;
+	align-self: center;
+	max-width: 100%;
+	max-height: 100% !important;
+	background-color: black;
+
+	justify-self: center;
 }
 
-::v-deep {
-	.plyr:-webkit-full-screen video,
-	.plyr:fullscreen video {
-		height: 100% !important;
+:deep() {
+	.plyr:-webkit-full-screen video {
 		width: 100% !important;
+		height: 100% !important;
+	}
+	.plyr:fullscreen video {
+		width: 100% !important;
+		height: 100% !important;
 	}
 	.plyr__progress__container {
 		flex: 1 1;
 	}
-	.plyr__volume {
-		min-width: 80px;
-	}
-	// plyr buttons style
-	.plyr--video .plyr__progress__buffer,
-	.plyr--video .plyr__control {
-		&.plyr__tab-focus,
-		&:hover,
-		&[aria-expanded=true] {
-			background-color: var(--color-primary-element);
-			color: var(--color-primary-text);
-			box-shadow: none !important;
+
+	.plyr {
+		@import '../mixins/Plyr';
+
+		// Override server font style
+		button {
+			color: white;
+
+			&:hover,
+			&:focus {
+				color: var(--color-primary-element-text);
+				background-color: var(--color-primary-element);
+			}
 		}
 	}
-	.plyr__control--overlaid {
-		background-color: var(--color-primary-element);
-	}
-	// plyr volume control
-	.plyr--full-ui input[type=range] {
-		color: var(--color-primary-element);
-	}
+}
+</style>
+
+<style lang="scss">
+main.viewer__hidden-fullscreen {
+	height: 100vh !important;
+	width: 100vw !important;
+	margin: 0 !important;
+}
+
+footer.viewer__hidden-fullscreen {
+	display: none !important;
 }
 </style>

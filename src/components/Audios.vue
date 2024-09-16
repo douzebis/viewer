@@ -3,7 +3,7 @@
  -
  - @author Daniel Kesselberg <mail@danielkesselberg.de>
  -
- - @license GNU AGPL version 3 or any later version
+ - @license AGPL-3.0-or-later
  -
  - This program is free software: you can redistribute it and/or modify
  - it under the terms of the GNU Affero General Public License as
@@ -23,14 +23,12 @@
 <template>
 	<!-- Plyr currently replaces the parent. Wrapping to prevent this
 	https://github.com/redxtech/vue-plyr/issues/259 -->
-	<div v-if="davPath">
-		<VuePlyr
-			ref="plyr"
+	<div v-if="src">
+		<VuePlyr ref="plyr"
 			:options="options">
-			<audio
-				ref="audio"
+			<audio ref="audio"
 				:autoplay="active"
-				:src="davPath"
+				:src="src"
 				preload="metadata"
 				@ended="donePlaying"
 				@canplay="doneLoading">
@@ -48,14 +46,18 @@
 </template>
 
 <script>
-import Vue from 'vue'
-import VuePlyr from '@skjnldsv/vue-plyr'
+// eslint-disable-next-line n/no-missing-import
 import '@skjnldsv/vue-plyr/dist/vue-plyr.css'
+import logger from '../services/logger.js'
 
-Vue.use(VuePlyr)
+const VuePlyr = () => import(/* webpackChunkName: 'plyr' */'@skjnldsv/vue-plyr')
 
 export default {
 	name: 'Audios',
+
+	components: {
+		VuePlyr,
+	},
 
 	computed: {
 		player() {
@@ -64,6 +66,8 @@ export default {
 		options() {
 			return {
 				autoplay: this.active === true,
+				// Used to reset the audio streams https://github.com/sampotts/plyr#javascript-1
+				blankVideo: '/blank.aac',
 				controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings'],
 				loadSprite: false,
 			}
@@ -83,6 +87,25 @@ export default {
 		},
 	},
 
+	mounted() {
+		// Prevent swiping to the next/previous item when scrubbing the timeline or changing volume
+		[...this.$el.querySelectorAll('.plyr__controls__item')].forEach(control => {
+			if (!control?.addEventListener) {
+				return
+			}
+			control.addEventListener('mouseenter', this.disableSwipe)
+			control.addEventListener('mouseleave', this.enableSwipe)
+		})
+	},
+
+	beforeDestroy() {
+		// Force stop any ongoing request
+		logger.debug('Closing audio stream', { filename: this.filename })
+		this.$refs.audio.pause()
+		this.player.stop()
+		this.player.destroy()
+	},
+
 	methods: {
 		donePlaying() {
 			this.$refs.audio.autoplay = false
@@ -94,36 +117,31 @@ export default {
 
 <style scoped lang="scss">
 audio {
-	background-color: black;
-	max-width: 100%;
-	max-height: 100%;
-	align-self: center;
-	justify-self: center;
 	/* over arrows in tiny screens */
 	z-index: 20050;
+	align-self: center;
+	max-width: 100%;
+	max-height: 100%;
+	background-color: black;
+
+	justify-self: center;
 }
 
-::v-deep {
+:deep() {
 	.plyr__progress__container {
 		flex: 1 1;
 	}
-	.plyr__volume {
-		min-width: 80px;
+
+	.plyr {
+		@import '../mixins/Plyr';
 	}
-	// plyr buttons style
-	.plyr--audio .plyr__progress__buffer,
-	.plyr--audio .plyr__control {
-		&.plyr__tab-focus,
-		&:hover,
-		&[aria-expanded=true] {
-			background-color: var(--color-primary-element);
-			color: var(--color-primary-text);
-			box-shadow: none !important;
+
+	// make it a bit off-center in order to fix mobile controls
+	@media only screen and (max-width: 500px) {
+		.plyr--audio {
+			top: calc(35vw / 2 + 60px / 2);
 		}
 	}
-	// plyr volume control
-	.plyr--full-ui input[type=range] {
-		color: var(--color-primary-element);
-	}
 }
+
 </style>
